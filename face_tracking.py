@@ -1,20 +1,18 @@
 import cv2
 import mediapipe as mp
-import RPi.GPIO as GPIO
-import time
+from gpiozero import Servo
+from gpiozero.pins.pigpio import PiGPIOFactory
 
 tilt_servoPIN = 17
 pan_servoPIN = 27
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(tilt_servoPIN, GPIO.OUT)
-GPIO.setup(pan_servoPIN, GPIO.OUT)
+factory = PiGPIOFactory()
 
-tilt_pwm = GPIO.PWM(tilt_servoPIN, 50)
-pan_pwm = GPIO.PWM(pan_servoPIN, 50)
+tilt = Servo(tilt_servoPIN, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=factory)
+pan = Servo(pan_servoPIN, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=factory)
 
-tilt_pwm.start(2.5) 
-pan_pwm.start(2.5)
+tilt.mid()
+pan.mid()
 
 pan_angle = 90
 tilt_angle = 90
@@ -23,22 +21,31 @@ pan_range = 2
 tilt_range = 2
 
 def SetAngle(type, angle):
-  duty = angle / 18 + 2
-  if type == 'tilt':
-    tilt_pwm.ChangeDutyCycle(duty)
-  elif type == 'pan':
-    pan_pwm.ChangeDutyCycle(duty)
-    
-SetAngle(type='pan', angle=90)
-SetAngle(type='tilt', angle=90)
+    if angle > 180: angle = 180
+    if angle >= 90:
+      value = angle / 90 - 1
+      if type == 'tilt':
+          tilt.value = value
+          # print(value)
+      if type == 'pan':
+          pan.value = value
+          # print(value)
+    if angle < 90:
+      value = - (1 - (angle/90))
+      if type == 'tilt':
+          tilt.value = value
+          # print(value)
+      if type == 'pan':
+          pan.value = value
+          # print(value)
 
 mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(2)
 
 with mp_face_detection.FaceDetection(
-    model_selection=0, min_detection_confidence=0.7) as face_detection:
+    model_selection=0, min_detection_confidence=0.7 ) as face_detection:
   
   while cap.isOpened():
     success, image = cap.read()
@@ -113,44 +120,41 @@ with mp_face_detection.FaceDetection(
           if x_angle > 180: 
             x_angle = 180
             pan_range = 88
+          print("Turning right, Pan range = {}, x angle = {}".format(pan_range, x_angle))
           SetAngle(type = "pan", angle = x_angle)
           pan_range += 2
-          print("Turning right, Pan range = {}, x angle = {}".format(pan_range, x_angle))
-          # time.sleep(0.05)
         
         # print(window_center_x, int(bb.xmin * window_width))
         if window_center_x < int(bb.xmin * window_width):
           if x_angle < 0: 
             x_angle = 0
             pan_range = -88
+          print("Turning left, Pan range = {}, x angle = {}".format(pan_range, x_angle))
           SetAngle(type = "pan", angle = x_angle)
           pan_range -= 2
-          print("Turning left, Pan range = {}, x angle = {}".format(pan_range, x_angle))
-          # time.sleep(0.05)
       
         # print(window_center_y, int((bb.ymin + bb.height) * window_height))
         if window_center_y > int((bb.ymin + bb.height) * window_height):
           if y_angle < 0: 
             y_angle = 0
             tilt_range = -88
+          print("Turning up, Tilt range = {}, y angle = {}".format(tilt_range, y_angle))
           SetAngle(type = "tilt", angle = y_angle)
           tilt_range -= 2
-          print("Turning up, Tilt range = {}, y angle = {}".format(tilt_range, y_angle))
           
         # print(window_center_y, int(bb.ymin * window_height))
         if window_center_y < int(bb.ymin * window_height):
           if y_angle > 180: 
             y_angle = 180
             tilt_range = 88
+          print("Turning down, Tilt range = {}, y angle = {}".format(tilt_range, y_angle))
           SetAngle(type = "tilt", angle = y_angle)
           tilt_range += 2
-          print("Turning down, Tilt range = {}, y angle = {}".format(tilt_range, y_angle))
           
     cv2.imshow('Face tracking', cv2.flip(image, 1))
     if cv2.waitKey(5) & 0xFF == 27:
       break
     
 cap.release()
-tilt_pwm.stop()
-pan_pwm.stop()
-GPIO.cleanup()
+tilt.mid()
+pan.mid()

@@ -1,3 +1,4 @@
+'''
 import RPi.GPIO as GPIO
 import time
 
@@ -32,3 +33,53 @@ except KeyboardInterrupt:
   tilt_pwm.stop()
   pan_pwm.stop()
   GPIO.cleanup()
+'''
+
+from gpiozero import Servo
+from gpiozero.pins.pigpio import PiGPIOFactory
+from time import sleep
+
+def setAngle(type, angle):
+    if angle >= 90:
+        value = angle / 90 - 1
+    elif angle < 90:
+        value = - (1 - (angle/90))
+    if type == 'tilt':
+        tilt.value = value
+    elif type == 'pan':
+        pan.value = value
+
+factory = PiGPIOFactory()
+
+tilt = Servo(17, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=factory)
+pan = Servo(27, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=factory)
+
+tilt.mid()
+pan.mid()
+
+tilt.max()
+sleep(1)
+tilt.mid()
+sleep(1)
+tilt.min()
+sleep(1)
+pan.max()
+sleep(1)
+pan.mid()
+sleep(1)
+pan.min()
+sleep(1)
+
+# for i in np.linspace(-1,1,20,endpoint=False):
+#     tilt.value = i
+#     pan.value = i
+#     print(i)
+#     sleep(0.05)
+
+for i in range (0, 180):
+    setAngle(type='tilt',angle=i)
+    setAngle(type='pan', angle=i)
+    sleep(0.005)
+
+tilt.mid()
+pan.mid()
